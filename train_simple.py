@@ -62,7 +62,7 @@ from utils.general import (
     yaml_save,
 )
 from utils.loggers import LOGGERS, Loggers
-from utils.loss import ComputeLoss
+from utils.loss import ComputeLoss, GIoULoss, CIoULoss
 from utils.metrics import fitness
 from utils.torch_utils import (
     EarlyStopping,

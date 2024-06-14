@@ -35,6 +35,7 @@ from utils.augmentations import (
     letterbox,
     mixup,
     random_perspective,
+    mosaic,
 )
 from utils.general import (
     DATASETS_DIR,

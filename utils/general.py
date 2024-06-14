@@ -1289,3 +1289,26 @@ if Path(inspect.stack()[0].filename).parent.parent.as_posix() in inspect.stack()
     cv2.imread, cv2.imwrite, cv2.imshow = imread, imwrite, imshow  # redefine
 
 # Variables ------------------------------------------------------------------------------------------------------------
+
+## Add for video inference
+def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
+    """
+    Rescales coordinates (xyxy) from img1_shape to img0_shape
+    :param img1_shape: shape of source image (height, width)
+    :param coords: coordinates to rescale
+    :param img0_shape: shape of target image (height, width)
+    :param ratio_pad: optional ratio padding (ratio, (pad_w, pad_h))
+    :return: rescaled coordinates
+    """
+    if ratio_pad is None:  # calculate from img0_shape
+        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
+        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+    else:
+        gain = ratio_pad[0]
+        pad = ratio_pad[1]
+
+    coords[:, [0, 2]] -= pad[0]  # x padding
+    coords[:, [1, 3]] -= pad[1]  # y padding
+    coords[:, :4] /= gain
+    coords[:, :4] = coords[:, :4].clamp(min=0, max=img0_shape[1] if coords[:, 0].ndim == 1 else img0_shape)  # clip
+    return coords

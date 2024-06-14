@@ -131,6 +131,10 @@ class ComputeLoss:
         self.anchors = m.anchors
         self.device = device
 
+        ## [MODIFIED] Add new loss
+        self.giou_loss = GIoULoss()
+        self.ciou_loss = CIoULoss()
+
     def __call__(self, p, targets):  # predictions, targets
         """Performs forward pass, calculating class, box, and object loss for given predictions and targets."""
         lcls = torch.zeros(1, device=self.device)  # class loss
@@ -252,3 +256,65 @@ class ComputeLoss:
             tcls.append(c)  # class
 
         return tcls, tbox, indices, anch
+
+## [MODIFIED] Add new loss
+class GIoULoss(nn.Module):
+    def forward(self, pred, target):
+        pred = pred.float()
+        target = target.float()
+
+        inter_x1 = torch.max(pred[:, 0], target[:, 0])
+        inter_y1 = torch.max(pred[:, 1], target[:, 1])
+        inter_x2 = torch.min(pred[:, 2], target[:, 2])
+        inter_y2 = torch.min(pred[:, 3], target[:, 3])
+        inter_area = torch.clamp(inter_x2 - inter_x1, min=0) * torch.clamp(inter_y2 - inter_y1, min=0)
+
+        pred_area = (pred[:, 2] - pred[:, 0]) * (pred[:, 3] - pred[:, 1])
+        target_area = (target[:, 2] - target[:, 0]) * (target[:, 3] - target[:, 1])
+
+        union_area = pred_area + target_area - inter_area
+
+        # IoU 계산
+        iou = inter_area / union_area
+
+        enclose_x1 = torch.min(pred[:, 0], target[:, 0])
+        enclose_y1 = torch.min(pred[:, 1], target[:, 1])
+        enclose_x2 = torch.max(pred[:, 2], target[:, 2])
+        enclose_y2 = torch.max(pred[:, 3], target[:, 3])
+        enclose_area = (enclose_x2 - enclose_x1) * (enclose_y2 - enclose_y1)
+
+        # GIoU 계산
+        giou = iou - (enclose_area - union_area) / enclose_area
+
+        return 1 - giou.mean()
+
+class CIoULoss(nn.Module):
+    def forward(self, pred, target):
+        pred = pred.float()
+        target = target.float()
+
+        # IoU 계산
+        inter_x1 = torch.max(pred[:, 0], target[:, 0])
+        inter_y1 = torch.max(pred[:, 1], target[:, 1])
+        inter_x2 = torch.min(pred[:, 2], target[:, 2])
+        inter_y2 = torch.min(pred[:, 3], target[:, 3])
+        inter_area = torch.clamp(inter_x2 - inter_x1, min=0) * torch.clamp(inter_y2 - inter_y1, min=0)
+        pred_area = (pred[:, 2] - pred[:, 0]) * (pred[:, 3] - pred[:, 1])
+        target_area = (target[:, 2] - target[:, 0]) * (target[:, 3] - target[:, 1])
+        union_area = pred_area + target_area - inter_area
+        iou = inter_area / union_area
+
+        center_pred = (pred[:, :2] + pred[:, 2:]) / 2
+        center_target = (target[:, :2] + target[:, 2:]) / 2
+        center_dist = torch.sum((center_pred - center_target) ** 2, dim=1)
+
+        enclose_x1 = torch.min(pred[:, 0], target[:, 0])
+        enclose_y1 = torch.min(pred[:, 1], target[:, 1])
+        enclose_x2 = torch.max(pred[:, 2], target[:, 2])
+        enclose_y2 = torch.max(pred[:, 3], target[:, 3])
+        enclose_diagonal = torch.sum((enclose_x2 - enclose_x1) ** 2 + (enclose_y2 - enclose_y1) ** 2)
+
+        # CIoU 계산
+        ciou = iou - (center_dist / enclose_diagonal)
+
+        return 1 - ciou.mean()

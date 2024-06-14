@@ -309,6 +309,42 @@ def mixup(im, labels, im2, labels2):
     labels = np.concatenate((labels, labels2), 0)
     return im, labels
 
+def mosaic(images, labels, input_dim):
+    """Applies Mosaic augmentation to a set of images and labels."""
+    assert len(images) == 4, "Mosaic augmentation requires exactly 4 images."
+
+    mosaic_image = np.full((input_dim * 2, input_dim * 2, 3), 114, dtype=np.uint8)
+    yc, xc = [int(random.uniform(-x, 2 * input_dim + x)) for x in [-input_dim // 2, input_dim // 2]]
+
+    labels4 = []
+    for i in range(4):
+        img, label = images[i], labels[i]
+        h, w, _ = img.shape
+
+        # Place img in mosaic_image
+        if i == 0:  # top left
+            mosaic_image[:h, :w, :] = img
+            x_offset, y_offset = 0, 0
+        elif i == 1:  # top right
+            mosaic_image[:h, xc:xc + w, :] = img
+            x_offset, y_offset = xc, 0
+        elif i == 2:  # bottom left
+            mosaic_image[yc:yc + h, :w, :] = img
+            x_offset, y_offset = 0, yc
+        elif i == 3:  # bottom right
+            mosaic_image[yc:yc + h, xc:xc + w, :] = img
+            x_offset, y_offset = xc, yc
+
+        # Adjust labels
+        labels = label.copy()
+        labels[:, 1] = x_offset + labels[:, 1] * w
+        labels[:, 2] = y_offset + labels[:, 2] * h
+        labels[:, 3] = x_offset + labels[:, 3] * w
+        labels[:, 4] = y_offset + labels[:, 4] * h
+        labels4.append(labels)
+
+    labels4 = np.concatenate(labels4, 0)
+    return mosaic_image, labels4
 
 def box_candidates(box1, box2, wh_thr=2, ar_thr=100, area_thr=0.1, eps=1e-16):
     """
